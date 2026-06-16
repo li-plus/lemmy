@@ -4,11 +4,18 @@ Record all your interactions with Claude Code as you develop your projects. See 
 
 ## Fork changes
 
-This is a fork of the upstream [`@mariozechner/claude-trace`](https://www.npmjs.com/package/@mariozechner/claude-trace). It adds the following changes on top of upstream:
+This is a fork of the upstream [`@mariozechner/claude-trace`](https://www.npmjs.com/package/@mariozechner/claude-trace). It incorporates the following changes on top of upstream:
+
+### Native Bun binary support via reverse proxy (PR [#56](https://github.com/badlogic/lemmy/pull/56))
+
+Modern Claude Code ships as a compiled native binary (Bun/ELF on Linux, Mach-O on macOS). The Node `--require` interceptor only works with JS-based Claude; for native binaries it is silently skipped. [PR #56](https://github.com/badlogic/lemmy/pull/56) added:
+
+- Detection of native binaries via magic bytes (ELF / Mach-O / PE).
+- A local HTTP reverse proxy that Claude's traffic is routed through, capturing requests and responses without needing to hook into the Node runtime.
 
 ### Reverse proxy honors `ANTHROPIC_BASE_URL`
 
-For native Claude Code binaries, claude-trace captures traffic with a reverse proxy that upstream hard-coded to `api.anthropic.com`. It now forwards to `ANTHROPIC_BASE_URL` instead (default `https://api.anthropic.com`), supporting `http`/`https` upstreams and base-path prefixes — so tracing through a relay or router just works:
+PR #56's reverse proxy was hard-coded to forward to `api.anthropic.com`. It now forwards to `ANTHROPIC_BASE_URL` instead (default `https://api.anthropic.com`), supporting `http`/`https` upstreams and base-path prefixes — so tracing through a relay or router just works:
 
 ```bash
 ANTHROPIC_BASE_URL=https://your-relay.example.com ANTHROPIC_AUTH_TOKEN=sk-... \
