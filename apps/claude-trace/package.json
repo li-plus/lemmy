@@ -1,5 +1,5 @@
 {
-	"name": "@mariozechner/claude-trace",
+	"name": "@li-plus/claude-trace",
 	"version": "1.0.8",
 	"description": "Record all your interactions with Claude Code as you develop your projects",
 	"main": "dist/index.js",
@@ -38,7 +38,8 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/mariozechner/lemmy.git"
+		"url": "git+https://github.com/badlogic/lemmy.git",
+		"directory": "apps/claude-trace"
 	},
 	"engines": {
 		"node": ">=16.0.0"
@@ -51,14 +52,14 @@
 	"dependencies": {
 		"@anthropic-ai/claude-code": "^1.0.0",
 		"@anthropic-ai/sdk": "^0.52.0",
-		"@mariozechner/claude-trace": "^1.0.3"
+		"@li-plus/claude-trace": "^1.0.3"
 	},
 	"directories": {
 		"test": "test"
 	},
 	"types": "./dist/index.d.ts",
 	"bugs": {
-		"url": "https://github.com/mariozechner/claude-trace/issues"
+		"url": "https://github.com/badlogic/lemmy/issues"
 	},
-	"homepage": "https://github.com/mariozechner/claude-trace#readme"
+	"homepage": "https://github.com/badlogic/lemmy/tree/main/apps/claude-trace#readme"
 }
