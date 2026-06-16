@@ -2,6 +2,19 @@
 
 Record all your interactions with Claude Code as you develop your projects. See everything Claude hides: system prompts, tool outputs, and raw API data in an intuitive web interface.
 
+## Fork changes
+
+This is a fork of the upstream [`@mariozechner/claude-trace`](https://www.npmjs.com/package/@mariozechner/claude-trace). It adds the following changes on top of upstream:
+
+### Reverse proxy honors `ANTHROPIC_BASE_URL`
+
+For native Claude Code binaries, claude-trace captures traffic with a reverse proxy that upstream hard-coded to `api.anthropic.com`. It now forwards to `ANTHROPIC_BASE_URL` instead (default `https://api.anthropic.com`), supporting `http`/`https` upstreams and base-path prefixes — so tracing through a relay or router just works:
+
+```bash
+ANTHROPIC_BASE_URL=https://your-relay.example.com ANTHROPIC_AUTH_TOKEN=sk-... \
+  claude-trace --run-with -p "hello"
+```
+
 ## Install
 
 ```bash
@@ -43,7 +56,7 @@ Logs are saved to `.claude-trace/log-YYYY-MM-DD-HH-MM-SS.{jsonl,html}` in your c
 By default, claude-trace filters logs to focus on substantial conversations:
 
 - **Default behavior**: Only logs requests to `/v1/messages` with more than 2 messages in the conversation
-- **With `--include-all-requests`**: Logs all requests made to `api.anthropic.com` including single-message requests and other endpoints
+- **With `--include-all-requests`**: Logs all requests made to the configured upstream endpoint (`ANTHROPIC_BASE_URL`, default `api.anthropic.com` — see [Fork changes](#fork-changes)) including single-message requests and other endpoints
 
 This filtering reduces log file size and focuses on meaningful development sessions, while still allowing you to capture everything when needed for debugging.
 

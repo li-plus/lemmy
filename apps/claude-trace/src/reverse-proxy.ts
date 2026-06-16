@@ -14,6 +14,8 @@ export interface ReverseProxyConfig {
 	includeAllRequests?: boolean;
 	openBrowser?: boolean;
 	logSensitiveHeaders?: boolean;
+	/** Upstream API base URL. Defaults to ANTHROPIC_BASE_URL or https://api.anthropic.com */
+	targetUrl?: string;
 }
 
 export class ReverseProxyServer {
@@ -23,8 +25,11 @@ export class ReverseProxyServer {
 	private logFile: string;
 	private htmlFile: string;
 	private htmlGenerator: HTMLGenerator;
-	private targetHost = "api.anthropic.com";
-	private targetPort = 443;
+	private targetProtocol: "http:" | "https:";
+	private targetHostname: string;
+	private targetPort: number;
+	private targetHost: string;
+	private targetBasePath: string;
 
 	constructor(config: ReverseProxyConfig = {}) {
 		this.config = {
@@ -34,7 +39,16 @@ export class ReverseProxyServer {
 			includeAllRequests: config.includeAllRequests || false,
 			openBrowser: config.openBrowser || false,
 			logSensitiveHeaders: config.logSensitiveHeaders || false,
+			targetUrl: config.targetUrl || process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com",
 		};
+
+		// Parse the upstream target from ANTHROPIC_BASE_URL (falls back to Anthropic).
+		const target = new URL(this.config.targetUrl);
+		this.targetProtocol = target.protocol === "http:" ? "http:" : "https:";
+		this.targetHostname = target.hostname;
+		this.targetPort = target.port ? Number(target.port) : this.targetProtocol === "https:" ? 443 : 80;
+		this.targetHost = target.host; // includes port when non-default
+		this.targetBasePath = target.pathname.replace(/\/+$/, ""); // strip trailing slash(es)
 
 		// Create log directory if needed
 		if (!fs.existsSync(this.config.logDirectory)) {
@@ -132,8 +146,10 @@ export class ReverseProxyServer {
 	}
 
 	public async start(): Promise<{ port: number; url: string }> {
-		// Use plain HTTP to avoid TLS certificate issues with Bun binaries
-		// The proxy receives HTTP from Claude, forwards as HTTPS to Anthropic
+		// Use plain HTTP to avoid TLS certificate issues with Bun binaries.
+		// The proxy receives HTTP from Claude, then forwards upstream using the
+		// protocol of the configured target (https for Anthropic, http/https for
+		// a custom ANTHROPIC_BASE_URL).
 		return new Promise((resolve, reject) => {
 			const httpServer = http.createServer((req, res) => {
 				this.handleRequest(req, res);
@@ -171,11 +187,12 @@ export class ReverseProxyServer {
 		});
 
 		req.on("end", () => {
-			// Forward the request to the real Anthropic API
+			// Forward the request to the upstream API (Anthropic or a custom base URL)
+			const transport = this.targetProtocol === "https:" ? https : http;
 			const options: https.RequestOptions = {
-				hostname: this.targetHost,
+				hostname: this.targetHostname,
 				port: this.targetPort,
-				path: req.url,
+				path: `${this.targetBasePath}${req.url}`,
 				method: req.method,
 				headers: {
 					...req.headers,
@@ -183,7 +200,7 @@ export class ReverseProxyServer {
 				},
 			};
 
-			const proxyReq = https.request(options, (proxyRes) => {
+			const proxyReq = transport.request(options, (proxyRes) => {
 				const responseTimestamp = Date.now();
 				const responseChunks: Buffer[] = [];
 
@@ -196,9 +213,8 @@ export class ReverseProxyServer {
 					res.end();
 
 					// Check if this is a request we should log
-					const url = `https://${this.targetHost}${req.url}`;
-					const shouldLog =
-						this.config.includeAllRequests || (req.url && req.url.includes("/v1/messages"));
+					const url = `${this.targetProtocol}//${this.targetHost}${this.targetBasePath}${req.url}`;
+					const shouldLog = this.config.includeAllRequests || (req.url && req.url.includes("/v1/messages"));
 
 					if (shouldLog) {
 						// Parse request body
@@ -260,9 +276,7 @@ export class ReverseProxyServer {
 							response: {
 								timestamp: responseTimestamp / 1000,
 								status_code: proxyRes.statusCode || 0,
-								headers: this.processHeaders(
-									proxyRes.headers as Record<string, string>,
-								),
+								headers: this.processHeaders(proxyRes.headers as Record<string, string>),
 								...parsedResponseBody,
 							},
 							logged_at: new Date().toISOString(),
