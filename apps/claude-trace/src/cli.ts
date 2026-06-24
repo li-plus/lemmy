@@ -5,6 +5,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { HTMLGenerator } from "./html-generator";
 import { ReverseProxyServer } from "./reverse-proxy";
+import { openInBrowser as openInBrowserHelper } from "./open-browser";
 
 // Colors for output
 export const colors = {
@@ -590,8 +591,11 @@ async function generateHTMLFromCLI(
 		const finalOutputFile = await htmlGenerator.generateHTMLFromJSONL(inputFile, outputFile, includeAllRequests);
 
 		if (openInBrowser) {
-			spawn("open", [finalOutputFile], { detached: true, stdio: "ignore" }).unref();
-			log(`Opening ${finalOutputFile} in browser`, "green");
+			openInBrowserHelper(
+				finalOutputFile,
+				(msg) => log(msg, "green"),
+				(msg) => log(msg, "red"),
+			);
 		}
 
 		process.exit(0);

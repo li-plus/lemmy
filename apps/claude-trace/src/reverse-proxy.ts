@@ -6,6 +6,7 @@ import * as zlib from "zlib";
 import { RawPair, SSEEvent } from "./types";
 import { HTMLGenerator } from "./html-generator";
 import { SharedConversationProcessor } from "./shared-conversation-processor";
+import { openInBrowser } from "./open-browser";
 
 export interface ReverseProxyConfig {
 	port?: number;
@@ -312,14 +313,7 @@ export class ReverseProxyServer {
 
 			// Open browser if requested
 			if (this.config.openBrowser && fs.existsSync(this.htmlFile)) {
-				try {
-					const { spawn } = require("child_process");
-					const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-					spawn(cmd, [this.htmlFile], { detached: true, stdio: "ignore" }).unref();
-					console.log(`Opening ${this.htmlFile} in browser`);
-				} catch (err) {
-					console.error(`Failed to open browser: ${err}`);
-				}
+				openInBrowser(this.htmlFile);
 			}
 
 			this.server.close();

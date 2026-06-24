@@ -1,6 +1,6 @@
 {
 	"name": "@li-plus/claude-trace",
-	"version": "1.0.9",
+	"version": "1.0.10",
 	"description": "Record all your interactions with Claude Code as you develop your projects",
 	"main": "dist/index.js",
 	"bin": {

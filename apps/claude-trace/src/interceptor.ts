@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
-import { spawn } from "child_process";
 import { RawPair } from "./types";
 import { HTMLGenerator } from "./html-generator";
+import { openInBrowser } from "./open-browser";
 
 export interface InterceptorConfig {
 	logDirectory?: string;
@@ -452,12 +452,7 @@ export class ClaudeTrafficLogger {
 		// Open browser if requested
 		const shouldOpenBrowser = process.env.CLAUDE_TRACE_OPEN_BROWSER === "true";
 		if (shouldOpenBrowser && fs.existsSync(this.htmlFile)) {
-			try {
-				spawn("open", [this.htmlFile], { detached: true, stdio: "ignore" }).unref();
-				console.log(`Opening ${this.htmlFile} in browser`);
-			} catch (error) {
-				console.log(`Failed to open browser: ${error}`);
-			}
+			openInBrowser(this.htmlFile, console.log, console.log);
 		}
 	}
 
