@@ -15,6 +15,8 @@ export interface ReverseProxyConfig {
 	includeAllRequests?: boolean;
 	openBrowser?: boolean;
 	logSensitiveHeaders?: boolean;
+	/** When true, don't persist raw SSE events; keep only the reconstructed message body. */
+	noEvents?: boolean;
 	/** Upstream API base URL. Defaults to ANTHROPIC_BASE_URL or https://api.anthropic.com */
 	targetUrl?: string;
 }
@@ -40,6 +42,7 @@ export class ReverseProxyServer {
 			includeAllRequests: config.includeAllRequests || false,
 			openBrowser: config.openBrowser || false,
 			logSensitiveHeaders: config.logSensitiveHeaders || false,
+			noEvents: config.noEvents || false,
 			targetUrl: config.targetUrl || process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com",
 		};
 
@@ -140,6 +143,7 @@ export class ReverseProxyServer {
 				title: `${this.pairs.length} API Calls`,
 				timestamp: new Date().toISOString().replace("T", " ").slice(0, -5),
 				includeAllRequests: this.config.includeAllRequests,
+				noEvents: this.config.noEvents,
 			});
 		} catch (err) {
 			console.error(`Failed to generate HTML: ${err}`);
@@ -251,13 +255,15 @@ export class ReverseProxyServer {
 							if (contentType.includes("application/json")) {
 								parsedResponseBody = { body: JSON.parse(responseBody) };
 							} else if (contentType.includes("text/event-stream")) {
-								const events = this.parseSSEEvents(responseBody);
+								// With --no-events, skip the (large) per-token SSE events
+								// entirely and keep only the reconstructed message body.
+								const events = this.config.noEvents ? {} : { events: this.parseSSEEvents(responseBody) };
 								const processor = new SharedConversationProcessor();
 								try {
 									const message = processor.parseStreamingResponse(responseBody);
-									parsedResponseBody = { body: message, events };
+									parsedResponseBody = { body: message, ...events };
 								} catch {
-									parsedResponseBody = { body_raw: responseBody, events };
+									parsedResponseBody = { body_raw: responseBody, ...events };
 								}
 							} else {
 								parsedResponseBody = { body_raw: responseBody };

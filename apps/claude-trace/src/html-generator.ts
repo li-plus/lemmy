@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { RawPair, ClaudeData, HTMLGenerationData } from "./types";
+import { stripEvents } from "./no-events";
 
 export class HTMLGenerator {
 	private frontendDir: string;
@@ -78,6 +79,7 @@ export class HTMLGenerator {
 			title?: string;
 			timestamp?: string;
 			includeAllRequests?: boolean;
+			noEvents?: boolean;
 		} = {},
 	): Promise<void> {
 		try {
@@ -86,6 +88,12 @@ export class HTMLGenerator {
 			// Remove filtering entirely - show all data
 			// Previously filtered to only include v1/messages pairs with messages.length >= 2
 			// but this was too aggressive and excluded valid data
+
+			// With --no-events, strip the raw SSE events/streams embedded in the HTML
+			// so the self-contained report stays small for token-heavy sessions.
+			if (options.noEvents) {
+				filteredPairs = filteredPairs.map(stripEvents);
+			}
 
 			// Load template and bundle files
 			const { htmlTemplate, jsBundle } = this.loadTemplateFiles();
@@ -135,6 +143,7 @@ export class HTMLGenerator {
 		jsonlFile: string,
 		outputFile?: string,
 		includeAllRequests: boolean = true,
+		noEvents: boolean = false,
 	): Promise<string> {
 		if (!fs.existsSync(jsonlFile)) {
 			throw new Error(`File '${jsonlFile}' not found.`);
@@ -167,7 +176,7 @@ export class HTMLGenerator {
 			outputFile = jsonlFile.replace(/\.jsonl$/, ".html");
 		}
 
-		await this.generateHTML(pairs, outputFile, { includeAllRequests });
+		await this.generateHTML(pairs, outputFile, { includeAllRequests, noEvents });
 		return outputFile;
 	}
 

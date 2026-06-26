@@ -37,6 +37,7 @@ ${colors.yellow}OPTIONS:${colors.reset}
   --run-with         Pass all following arguments to Claude process
   --include-all-requests Include all requests made through fetch, otherwise only requests to v1/messages with more than 2 messages in the context
   --include-sensitive-headers Log sensitive headers (auth tokens, cookies) without redaction
+  --no-events        Don't write raw SSE events to the JSONL/HTML (keeps only the reconstructed message), producing much smaller traces
   --no-open          Don't open generated HTML file in browser
   --log              Specify custom log file base name (without extension)
   --claude-path      Specify custom path to Claude binary
@@ -298,6 +299,7 @@ async function runClaudeNativeWithProxy(
 	openInBrowser: boolean = false,
 	logBaseName?: string,
 	logSensitiveHeaders: boolean = false,
+	noEvents: boolean = false,
 ): Promise<void> {
 	log("Using reverse proxy mode for native binary", "yellow");
 	console.log("");
@@ -311,6 +313,7 @@ async function runClaudeNativeWithProxy(
 		includeAllRequests: includeAllRequests,
 		openBrowser: openInBrowser,
 		logSensitiveHeaders: logSensitiveHeaders,
+		noEvents: noEvents,
 		targetUrl: upstreamBaseUrl,
 	});
 
@@ -388,6 +391,7 @@ async function runClaudeWithInterception(
 	customClaudePath?: string,
 	logBaseName?: string,
 	logSensitiveHeaders: boolean = false,
+	noEvents: boolean = false,
 ): Promise<void> {
 	log("Claude Trace", "blue");
 	log("Starting Claude with traffic logging", "yellow");
@@ -410,6 +414,7 @@ async function runClaudeWithInterception(
 			openInBrowser,
 			logBaseName,
 			logSensitiveHeaders,
+			noEvents,
 		);
 		return;
 	}
@@ -430,6 +435,7 @@ async function runClaudeWithInterception(
 			NODE_OPTIONS: "--no-deprecation",
 			CLAUDE_TRACE_INCLUDE_ALL_REQUESTS: includeAllRequests ? "true" : "false",
 			CLAUDE_TRACE_OPEN_BROWSER: openInBrowser ? "true" : "false",
+			CLAUDE_TRACE_NO_EVENTS: noEvents ? "true" : "false",
 			...(logBaseName ? { CLAUDE_TRACE_LOG_NAME: logBaseName } : {}),
 		},
 		stdio: "inherit",
@@ -585,10 +591,16 @@ async function generateHTMLFromCLI(
 	outputFile?: string,
 	includeAllRequests: boolean = false,
 	openInBrowser: boolean = false,
+	noEvents: boolean = false,
 ): Promise<void> {
 	try {
 		const htmlGenerator = new HTMLGenerator();
-		const finalOutputFile = await htmlGenerator.generateHTMLFromJSONL(inputFile, outputFile, includeAllRequests);
+		const finalOutputFile = await htmlGenerator.generateHTMLFromJSONL(
+			inputFile,
+			outputFile,
+			includeAllRequests,
+			noEvents,
+		);
 
 		if (openInBrowser) {
 			openInBrowserHelper(
@@ -666,6 +678,9 @@ async function main(): Promise<void> {
 	// Check for sensitive headers logging flag
 	const logSensitiveHeaders = claudeTraceArgs.includes("--include-sensitive-headers");
 
+	// Check for no-events flag (drop raw SSE events from JSONL/HTML)
+	const noEvents = claudeTraceArgs.includes("--no-events");
+
 	// Scenario 2: --extract-token
 	if (claudeTraceArgs.includes("--extract-token")) {
 		await extractToken(customClaudePath);
@@ -693,7 +708,7 @@ async function main(): Promise<void> {
 			process.exit(1);
 		}
 
-		await generateHTMLFromCLI(inputFile, outputFile, includeAllRequests, openInBrowser);
+		await generateHTMLFromCLI(inputFile, outputFile, includeAllRequests, openInBrowser, noEvents);
 		return;
 	}
 
@@ -711,6 +726,7 @@ async function main(): Promise<void> {
 		customClaudePath,
 		logBaseName,
 		logSensitiveHeaders,
+		noEvents,
 	);
 }
 

@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { RawPair } from "./types";
 import { HTMLGenerator } from "./html-generator";
+import { SharedConversationProcessor } from "./shared-conversation-processor";
 import { openInBrowser } from "./open-browser";
 
 export interface InterceptorConfig {
@@ -9,6 +10,8 @@ export interface InterceptorConfig {
 	logBaseName?: string;
 	enableRealTimeHTML?: boolean;
 	logLevel?: "debug" | "info" | "warn" | "error";
+	/** When true, don't persist raw SSE streams; keep only the reconstructed message body. */
+	noEvents?: boolean;
 }
 
 export class ClaudeTrafficLogger {
@@ -19,12 +22,14 @@ export class ClaudeTrafficLogger {
 	private pairs: RawPair[] = [];
 	private config: InterceptorConfig;
 	private htmlGenerator: HTMLGenerator;
+	private processor: SharedConversationProcessor = new SharedConversationProcessor();
 
 	constructor(config: InterceptorConfig = {}) {
 		this.config = {
 			logDirectory: ".claude-trace",
 			enableRealTimeHTML: true,
 			logLevel: "info",
+			noEvents: process.env.CLAUDE_TRACE_NO_EVENTS === "true",
 			...config,
 		};
 
@@ -138,6 +143,19 @@ export class ClaudeTrafficLogger {
 		return body;
 	}
 
+	// For SSE streams, --no-events reconstructs the final message and drops the
+	// raw stream (which is the bulk of the log); otherwise the raw stream is kept.
+	private eventStreamResult(body_raw: string): { body?: any; body_raw?: string } {
+		if (this.config.noEvents) {
+			try {
+				return { body: this.processor.parseStreamingResponse(body_raw) };
+			} catch {
+				return { body_raw };
+			}
+		}
+		return { body_raw };
+	}
+
 	private async parseResponseBody(response: Response): Promise<{ body?: any; body_raw?: string }> {
 		const contentType = response.headers.get("content-type") || "";
 
@@ -147,7 +165,7 @@ export class ClaudeTrafficLogger {
 				return { body };
 			} else if (contentType.includes("text/event-stream")) {
 				const body_raw = await response.text();
-				return { body_raw };
+				return this.eventStreamResult(body_raw);
 			} else if (contentType.includes("text/")) {
 				const body_raw = await response.text();
 				return { body_raw };
@@ -395,7 +413,7 @@ export class ClaudeTrafficLogger {
 			if (contentType && contentType.includes("application/json")) {
 				return { body: JSON.parse(body) };
 			} else if (contentType && contentType.includes("text/event-stream")) {
-				return { body_raw: body };
+				return this.eventStreamResult(body);
 			} else {
 				return { body_raw: body };
 			}
@@ -420,6 +438,7 @@ export class ClaudeTrafficLogger {
 				title: `${this.pairs.length} API Calls`,
 				timestamp: new Date().toISOString().replace("T", " ").slice(0, -5),
 				includeAllRequests,
+				noEvents: this.config.noEvents,
 			});
 			// Silent HTML generation
 		} catch (error) {

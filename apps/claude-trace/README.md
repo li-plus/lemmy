@@ -37,6 +37,9 @@ claude-trace
 # Include all API requests (by default, only substantial conversations are logged)
 claude-trace --include-all-requests
 
+# No-events mode: don't store raw SSE events, only the reconstructed messages (much smaller traces)
+claude-trace --no-events
+
 # Run Claude with specific arguments
 claude-trace --run-with chat --model sonnet-3.5
 
@@ -66,6 +69,22 @@ By default, claude-trace filters logs to focus on substantial conversations:
 - **With `--include-all-requests`**: Logs all requests made to the configured upstream endpoint (`ANTHROPIC_BASE_URL`, default `api.anthropic.com` — see [Fork changes](#fork-changes)) including single-message requests and other endpoints
 
 This filtering reduces log file size and focuses on meaningful development sessions, while still allowing you to capture everything when needed for debugging.
+
+## Event-free Traces
+
+Streaming responses are logged as a long list of per-token SSE events (`response.events` / `response.body_raw`). For token-heavy sessions this is by far the largest part of the `.jsonl` and the embedded HTML data.
+
+- **`--no-events`**: skips the raw SSE events and stores only the reconstructed final message (`response.body`). The conversation view renders identically; only the raw SSE list in the "Raw calls" debug view is omitted.
+
+```bash
+# Capture a session without raw SSE events
+claude-trace --no-events
+
+# Re-render an existing log into a smaller, event-free HTML
+claude-trace --generate-html log.jsonl log.small.html --no-events
+```
+
+Note that `--no-events` affects what is captured/embedded going forward; it does not rewrite the raw events back into an already-recorded full `.jsonl`.
 
 ## Conversation Indexing
 
