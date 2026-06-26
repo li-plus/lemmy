@@ -59,8 +59,13 @@ export class HTMLGenerator {
 		// Convert to JSON with minimal whitespace
 		const dataJson = JSON.stringify(claudeData, null, 0);
 
-		// Base64 encode to avoid all escaping issues
-		return Buffer.from(dataJson, "utf-8").toString("base64");
+		// Embed as plain text (no base64) to save ~33% size. The JSON lives inside
+		// a <script type="application/json"> block, so the only way it could break
+		// out of that element is a literal "</script>" (or "<!--") in string
+		// content. Escaping every "<" to its JSON unicode escape prevents that
+		// while keeping the payload valid JSON. "<" only ever appears inside JSON
+		// string values, where "\u003c" is an equivalent, parseable escape.
+		return dataJson.replace(/</g, "\\u003c");
 	}
 
 	private escapeHtml(text: string): string {
@@ -119,7 +124,9 @@ export class HTMLGenerator {
 			// Reconstruct the template with the bundle injected between the split parts
 			let htmlContent = templateParts[0] + jsBundle + templateParts[1];
 			htmlContent = htmlContent
-				.replace("__CLAUDE_LOGGER_DATA_REPLACEMENT_UNIQUE_9487__", dataJsonEscaped)
+				// Function replacement so "$" sequences in the JSON aren't treated
+				// as special replacement patterns (e.g. "$&", "$1") by String.replace.
+				.replace("__CLAUDE_LOGGER_DATA_REPLACEMENT_UNIQUE_9487__", () => dataJsonEscaped)
 				.replace(
 					"__CLAUDE_LOGGER_TITLE_REPLACEMENT_UNIQUE_9487__",
 					this.escapeHtml(options.title || `${filteredPairs.length} API Calls`),

@@ -8,8 +8,9 @@
 <body>
     <div id="app"></div>
     
+    <script id="claude-data" type="application/json">__CLAUDE_LOGGER_DATA_REPLACEMENT_UNIQUE_9487__</script>
     <script>
-      window.claudeData = JSON.parse(decodeURIComponent(escape(atob('__CLAUDE_LOGGER_DATA_REPLACEMENT_UNIQUE_9487__'))));
+      window.claudeData = JSON.parse(document.getElementById('claude-data').textContent);
     </script>
     
     <script>
